@@ -1,0 +1,344 @@
+---
+title: "Putting the Pieces Together: Combining Data from Multiple Sources"
+subtitle: "TIF Lesson 2 in R"
+author: "Danielle Sass"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    code-fold: false
+    embed-resources: true
+    link-external-newwindow: true
+    
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Overview
+
+In this lesson, we will combine the TIF data files that we obtained in Lesson 1 into a single dataset that can be used for analysis.
+
+
+### Learning Objectives
+
+By the end of this lesson, you should be able to:
+
+- Read .csv files into R
+- Explain the difference between joining datasets and binding datasets.
+- Determine when to use various join functions.
+- Save a dataset as a .csv file
+
+::: {.callout-note appearance="minimal" icon="false"}
+
+## AI in this Lesson
+
+This lesson uses AI as a coding assistant, not as a replacement for understanding the code. You will use AI to generate possible solutions, but you should be able to explain what the code does and determine whether the solution is appropriate for your data.
+
+Different AI systems, prompts, conversation history, and randomness can produce different solutions. There may be multiple correct ways to accomplish the same task.
+
+:::
+
+
+### Packages Needed
+
+The following package is needed for this lesson:
+
+```{r}
+library(tidyverse)
+```
+
+
+## Reading in the Data
+
+In Lesson 1, you downloaded and saved the following files in the `data/` subdirectory:
+
+- `tif_reports_2010.csv`, ..., `tif_reports_2023.csv`
+- `tif_districts.csv`
+
+In this lesson, we'll begin by reading these files into R and storing them as objects.
+
+### The `read_csv()` function
+
+Because our files are `.csv` files, we'll use the `read_csv()` function from the **readr** package, which is included in the **tidyverse**.
+
+You can learn more about a function by using R's built-in help documentation. Try entering the following in your R console:
+
+```{r}
+#| eval: false
+
+?read_csv
+```
+
+The main argument required by `read_csv()` is the file path. Because our files are stored in the `data/` subdirectory, we'll use the following structure:
+
+```{r}
+#| eval: false
+ 
+read_csv("data/file_name.csv")
+```
+
+For example, to read in the 2010 TIF reports:
+
+```{r}
+read_csv("data/tif_reports_2010.csv")
+```
+
+Notice that R prints the contents of the dataset, but we haven't actually saved the dataset anywhere. To use the data later, we need to assign it to an object.
+
+We can do this using the assignment operator `<-`:
+
+```{r}
+tif_reports_2010 <- read_csv("data/tif_reports_2010.csv")
+```
+
+::: {.callout-tip appearance="minimal" icon="false"}
+## Your Turn
+
+Read in the 2011 TIF report dataset and store it in an object called `tif_reports_2011`.
+
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+```{r}
+tif_reports_2011 <- read_csv("data/tif_reports_2011.csv")
+```
+
+:::
+
+### Reading in all the csvs
+
+We could continue in this manner for each individual file and it would accomplish our goal of reading in all of our needed files. However, anytime you are doing something repetitive, often times it is more efficient to iterate. This is a more advanced technique and can be tricky if we do not have a lot of prior experience. Let's try creating a prompt to use in either GitHub copilot or your AI browser of choice to make our code more efficient.
+
+::: {.callout-tip appearance="minimal" icon="false"}
+## Your Turn
+
+Try writing out a prompt to accomplish the goal of reading in all 14 of our csv files efficiently.
+
+:::
+
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+There are many possible functions and ways to accomplish our goal, so creating a meaningful prompt is important. Perhaps we start with the prompt "Read in all `.csv` files within a `data/` subdirectory using R tidyverse."
+
+```{r}
+#| eval: false
+
+csv_files <- list.files(
+  "data",
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+data_list <- csv_files |>
+  map(read_csv)
+
+all_data <- bind_rows(data_list)
+```
+:::
+
+**Your answer may look different from someone else's. Different AI systems, conversation history, and randomness can all affect the response generated from the same prompt.**
+
+::: {.callout-tip collapse="true" icon="false"}
+## Tip
+
+If your assisted code provides packages, make sure those are included at the top of your document in the `Load packages` section. 
+
+It is good practice to load all needed packages in one place rather than many individual code chunks. If you already loaded the package once, there is no need to load it again.
+
+It is good practice to **comment your code** especially when using new functions that you may not be familiar with.
+
+:::
+
+If you try running the code above it will result in an error. Why is that? Let's modify our prompt to be more specific. We need to add that we want each file to be saved as an object and named with their file name.
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+Using R and the tidyverse, read in all .csv files from the `data/` subdirectory and store each dataset as a separate object named after its corresponding filename.
+
+```{r}
+#| code-fold: true
+
+# Find all CSV files in the data subdirectory
+csv_files <- list.files(
+  "data",
+  pattern = "\\.csv$",       # Only include files ending in .csv
+  full.names = TRUE           # Return the complete file path
+) 
+  
+csv_files |>
+  # Repeat the following operation for each file
+  walk(~ assign(
+    # Use the filename (without the .csv extension) as the object name
+    tools::file_path_sans_ext(basename(.x)),
+    # Read the CSV file into R
+    read_csv(.x),
+    # Store each dataset as a separate object in the global environment
+    envir = .GlobalEnv
+  ))
+```
+
+:::
+
+
+## Merging the Data
+
+Now that we have all of our datasets loaded, we want to combine them into a single dataset. The best approach depends on how the datasets are structured and what we want to accomplish.
+
+There are three common ways to combine datasets in the tidyverse:
+
+- join datasets by a key (`full_join()`, `left_join()`, `right_join()`, `inner_join()`). Use a join when you have two datasets that contain the same observations but different variables. A key variable is used to match observations between the datasets.
+- stack datasets by rows (`bind_rows()`). When datasets contain the same types of variables and you want to add observations from one dataset below another.
+- combine datasets by columns (`bind_cols()`). When datasets contain the same observations in the same order, but different variables.
+
+### Combining years
+
+Take a moment to inspect the `tif_reports_2010` and `tif_reports_2011` datasets. Which of the above approaches do you think would be most appropriate for merging these datasets?
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+For our TIF data, we want to stack the observations from multiple years because each year's dataset contains the same types of information for different reporting years.
+
+Therefore, `bind_rows()` is the appropriate approach.
+
+:::
+
+::: {.callout-tip appearance="minimal" icon="false"}
+## Your Turn
+
+Try combining the `tif_reports_2010` with the `tif_reports_2011` dataset.
+
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+```{r}
+combined_reports <- tif_reports_2010 |> 
+  bind_rows(tif_reports_2011)
+```
+
+:::
+
+Continue piping the remaining `tif_reports_*` into `bind_rows()` to merge all the report data together. 
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+```{r}
+# Combine the datasets using bind_rows
+combined_reports <- tif_reports_2010 |> 
+  bind_rows(tif_reports_2011) |> 
+  bind_rows(tif_reports_2012) |> 
+  bind_rows(tif_reports_2013) |> 
+  bind_rows(tif_reports_2014) |> 
+  bind_rows(tif_reports_2015) |>
+  bind_rows(tif_reports_2016) |>
+  bind_rows(tif_reports_2017) |>
+  bind_rows(tif_reports_2018) |>
+  bind_rows(tif_reports_2019) |>
+  bind_rows(tif_reports_2020) |>
+  bind_rows(tif_reports_2021) |>
+  bind_rows(tif_reports_2022) |>
+  bind_rows(tif_reports_2023)
+```
+
+:::
+
+::: {.callout-warning collapse="true" icon="false"}
+## Challenge 
+
+Use a function to map the tif reports more efficiently.
+
+```{r}
+#| code-fold: true
+combined_reports <- mget(
+  paste0("tif_reports_", 2010:2023)
+) |>
+  bind_rows()
+```
+
+:::
+
+### Merge with district information
+
+Take a moment to inspect the `tif_districts` dataset. Which of the three common ways to combine datasets do you think would be most appropriate for merging this dataset with our new dataset containing all of the tif reports?
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+We will use one of the `*_join()` functions to merge based on the keys `tif_name` and `tif_year`.
+
+- `full_join()`
+- `left_join()`
+- `right_join()`
+- `inner_join()`
+
+:::
+
+
+::: {.callout-tip appearance="minimal" icon="false"}
+## Your Turn
+
+Look up the help documentation for the join function and merge `combined_reports` with `tif_districts`.
+
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+After inspecting the datasets `tif_districts` contained 2049 observations and our `combined_reports` only contained 1881 observations. This means that some observations in `tif_districts` do not have a corresponding observation in `combined_reports`.
+
+There may be several reasons for this difference. For example, some PDF reports may not have been successfully scraped, or a report may not contain the expected information for a particular district and year.
+
+Because we want to preserve every district-year observation in `tif_districts`, we will use a `left_join()`. A left join keeps every observation from the data frame on the left side of the join and adds matching information from the data frame on the right. If a matching observation is not found, the variables from `combined_reports` will contain `NA`.
+
+```{r}
+tif_data <- tif_districts |> 
+  left_join(combined_reports)
+```
+
+:::
+
+
+## Save merged data
+
+Now that we have combined all of our datasets into a single data frame, let's save the data to our `data/` subdirectory. Saving the combined dataset allows us to use it again in the future without having to repeat the steps above.
+
+We can use the `write_csv()` function from the **readr** package to save a data frame as a `.csv` file.
+
+The first argument is the name of the data frame we want to save, and the second argument specifies where and under what name we want to save the file.
+
+
+```{r}
+#| eval: false
+write_csv(dataset, "data/file_name.csv")
+```
+
+::: {.callout-tip appearance="minimal" icon="false"}
+
+## You Try
+
+Save the combined TIF dataset as `tif_data.csv` in the `data/` subdirectory.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution
+
+```{r}
+write_csv(tif_data, "data/tif_data.csv")
+```
+
+:::
+
